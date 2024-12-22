@@ -1,95 +1,59 @@
-import socket  # Импортируем модуль socket для работы с сетевыми соединениями
+# ИСАДИЧЕВА ДАРЬЯ АЛЕКСЕЕВНА, ДПИ22-1
 
-# Функция для безопасного ввода адреса хоста с значением по умолчанию
-def get_host():
-    host_input = input("Введите адрес хоста [по умолчанию 'localhost']: ")
-    if not host_input.strip():
-        return 'localhost'
-    else:
-        return host_input
+# Код клиента
 
-# Функция для безопасного ввода номера порта с значением по умолчанию
-def get_port():
+# Импортируем модуль socket для работы с сетевыми соединениями
+import socket
+def my_client():
+    # Запрашиваем у пользователя хост и порт
+    host = input("Введите адрес сервера (по умолчанию 'localhost'): ").strip() or "localhost"
     while True:
+        port_input = input("Введите порт сервера (число от 1 до 65535): ").strip()
+        if port_input.isdigit() and 1 <= int(port_input) <= 65535:
+            port = int(port_input)
+            break
+        else:
+            print("Ошибка: введите корректный номер порта (число от 1 до 65535).")
+    print(f"Попытка подключения к серверу {host}:{port}...")
+
+    # Создание сокета
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         try:
-            port_input = input("Введите номер порта [по умолчанию 12345]: ")
-            if not port_input.strip():
-                port = 12345
-            else:
-                port = int(port_input)
-            if 1 <= port <= 65535:
-                return port
-            else:
-                print("Пожалуйста, введите номер порта от 1 до 65535.")
-        except ValueError:
-            print("Некорректный ввод. Пожалуйста, введите числовое значение номера порта.")
+            # Подключаемся к серверу
+            sock.connect((host, port))
+            print(f"Соединение с сервером {host}:{port} установлено - сервер принял подключение.")
 
-# Получаем адрес хоста и порт от пользователя
-host = get_host()
-port = get_port()
+            # Цикл, в котором запрашиваются данные
+            while True:
+                message = input("Введите данные, которые бы хотели отправить серверу: ")
+                if not message:
+                    print("Сообщение не должно быть пустым. Попробуйте снова, либо напишите 'exit' чтобы разорвать соединение.")
+                    continue
+                # Если введена команда "exit", разрываем соединение
+                if message.strip().lower() == "exit":
+                    sock.send(message.encode())
+                    break
 
-# Создаем TCP/IP сокет
-# socket.AF_INET означает, что будем использовать протокол IPv4
-# socket.SOCK_STREAM означает, что будем использовать протокол TCP
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                # Отправляем данные серверу
+                sock.send(message.encode())
+                print("Данные были отправлены серверу.")
 
-# Устанавливаем блокирующий режим сокета (по умолчанию он уже блокирующий)
-# sock.setblocking(1)  # Эта строка необязательна и оставлена для информации
+                # Принимаем данные от сервера порционно
+                data = sock.recv(1024)
+                print(f"Приём данных от сервера: {data.decode()}")
 
-# Устанавливаем соединение с сервером по указанному адресу и порту
-try:
-    sock.connect((host, port))
-    print("Connected to server")  # пункт 4.i выполнен
-except ConnectionRefusedError:
-    print(f"Не удалось подключиться к серверу {host}:{port}. Проверьте адрес и порт.")
+        # Ошибка подключения
+        except ConnectionRefusedError:
+            print(f"ОШИБКА! Не удалось подключиться к серверу {host}:{port}. Проверьте сервер, хост и порт.")
+
+        # Прерывание программы
+        except KeyboardInterrupt:
+            print(f"\nВНИМАНИЕ! Принято KeyboardInterrupt. Принудительный разрыв с сервером.")
+
+    # Закрытие соединения
+    print("Разрыв соединения с сервером...")
     sock.close()
-    exit()
+    print("Соединение с сервером разорвано.")
 
-# Инициализируем переменную для накопления полученных данных
-received_data = ''
-
-# Основной цикл для отправки сообщений на сервер
-while True:
-    # Запрашиваем у пользователя сообщение для отправки на сервер
-    msg = input("Your string (type 'exit' to quit):")
-    # Отправляем сообщение серверу, добавляя символ '\n' в конце для обозначения конца сообщения
-    try:
-        sock.send((msg + '\n').encode('utf-8'))
-        print("Message sent to server")  # пункт 4.iii выполнен
-    except BrokenPipeError:
-        print("Соединение с сервером было потеряно.")
-        break
-
-    # Инициализируем переменную для хранения полного ответа от сервера
-    full_response = ''
-    # Получаем ответ от сервера
-    while True:
-        try:
-            data = sock.recv(1024)
-            if not data:
-                # Если получили пустые данные, значит соединение закрыто
-                print("Сервер закрыл соединение.")
-                sock.close()
-                exit()
-            # Декодируем полученные байты и добавляем к накопленной строке
-            received_data += data.decode('utf-8')
-            # Проверяем, есть ли полный ответ (наличие '\n' в received_data)
-            if '\n' in received_data:
-                # Разделяем данные по символу новой строки '\n'
-                line, received_data = received_data.split('\n', 1)
-                full_response = line
-                break  # Выходим из цикла ожидания ответа
-        except ConnectionResetError:
-            print("Соединение было разорвано сервером.")
-            sock.close()
-            exit()
-    print("Message received from server")  # пункт 4.iv выполнен
-    print(full_response)  # Выводим ответ от сервера
-
-    # Если мы отправили 'exit', завершаем цикл
-    if msg.lower() == 'exit':
-        break  # Выходим из цикла отправки сообщений
-
-# После выхода из цикла закрываем соединение с сервером
-sock.close()
-print("Connection closed to server")  # пункт 4.ii выполнен
+if __name__ == "__main__":
+    my_client()
